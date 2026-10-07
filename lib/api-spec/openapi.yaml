@@ -1,0 +1,699 @@
+﻿openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: AirQr catalog and mock eSIM checkout API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: catalog
+    description: Countries and eSIM plans
+  - name: orders
+    description: Orders and secure eSIM delivery
+  - name: account
+    description: Email-based account access
+  - name: webhooks
+    description: Provider webhook stubs
+  - name: contact
+    description: Customer support requests
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /countries:
+    get:
+      operationId: listCountries
+      tags: [catalog]
+      summary: List active eSIM countries
+      parameters:
+        - $ref: "#/components/parameters/Region"
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/MaxPriceCents"
+      responses:
+        "200":
+          description: Countries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Country"
+  /countries/{slug}:
+    get:
+      operationId: getCountry
+      tags: [catalog]
+      summary: Get a country and its active plans
+      parameters:
+        - $ref: "#/components/parameters/CountrySlug"
+      responses:
+        "200":
+          description: Country detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CountryDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /countries/{slug}/stats:
+    get:
+      operationId: getCountryStats
+      tags: [catalog]
+      summary: Get order volume for a country in the current month
+      parameters:
+        - $ref: "#/components/parameters/CountrySlug"
+      responses:
+        "200":
+          description: Country stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CountryStats"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /plans/{id}:
+    get:
+      operationId: getPlan
+      tags: [catalog]
+      summary: Get a plan
+      parameters:
+        - $ref: "#/components/parameters/PlanId"
+      responses:
+        "200":
+          description: Plan detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Plan"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /orders:
+    post:
+      operationId: createOrder
+      tags: [orders]
+      summary: Create a pending order for one eSIM plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderInput"
+      responses:
+        "201":
+          description: Pending order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderCreated"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /orders/{publicId}:
+    get:
+      operationId: getOrder
+      tags: [orders]
+      summary: Get a protected order and eSIM delivery data
+      parameters:
+        - $ref: "#/components/parameters/PublicId"
+        - name: token
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Order detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "403":
+          description: Access token required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /payments/mock/confirm:
+    post:
+      operationId: confirmMockPayment
+      tags: [orders]
+      summary: Confirm a mock payment and provision an eSIM
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentConfirmation"
+      responses:
+        "200":
+          description: Payment and provisioning result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentConfirmationResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /account/request-link:
+    post:
+      operationId: requestAccountLink
+      tags: [account]
+      summary: Request an email account access link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountLinkInput"
+      responses:
+        "200":
+          description: Mock access link request accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountLinkResult"
+  /account/orders:
+    get:
+      operationId: listAccountOrders
+      tags: [account]
+      summary: List orders for the mock account session
+      responses:
+        "200":
+          description: Account orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AccountOrder"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /contact:
+    post:
+      operationId: createContactMessage
+      tags: [contact]
+      summary: Submit a support request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactMessageInput"
+      responses:
+        "201":
+          description: Message stored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContactMessageCreated"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /esim/status:
+    get:
+      operationId: getEsimStatus
+      tags: [orders]
+      summary: Get live eSIM connectivity status
+      parameters:
+        - name: publicId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/OrderAccessToken"
+      responses:
+        "200":
+          description: eSIM status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EsimStatusResult"
+        "403":
+          $ref: "#/components/responses/Unauthorized"
+  /webhooks/payment:
+    post:
+      operationId: receivePaymentWebhook
+      tags: [webhooks]
+      summary: Receive an idempotent payment webhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookInput"
+      responses:
+        "200":
+          description: Webhook accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookResult"
+  /webhooks/esim:
+    post:
+      operationId: receiveEsimWebhook
+      tags: [webhooks]
+      summary: Receive an idempotent eSIM webhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookInput"
+      responses:
+        "200":
+          description: Webhook accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookResult"
+components:
+  parameters:
+    Region:
+      name: region
+      in: query
+      required: false
+      schema:
+        type: string
+    Search:
+      name: search
+      in: query
+      required: false
+      schema:
+        type: string
+    MaxPriceCents:
+      name: maxPriceCents
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+    CountrySlug:
+      name: slug
+      in: path
+      required: true
+      schema:
+        type: string
+    PlanId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PublicId:
+      name: publicId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    OrderAccessToken:
+      name: token
+      in: query
+      required: true
+      description: Order access token that proves ownership
+      schema:
+        type: string
+        format: uuid
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Account session required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    ContactMessageInput:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        subject:
+          type: string
+          enum: [general, order_issue, refund, partnership]
+        message:
+          type: string
+      required: [email, name, subject, message]
+    ContactMessageCreated:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [new, resolved]
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, status, createdAt]
+    EsimStatusResult:
+      type: object
+      properties:
+        state:
+          type: string
+          enum: [active, inactive, exhausted]
+        dataRemainingGb:
+          type: number
+        validityRemainingDays:
+          type: integer
+        lastSeenAt:
+          type: string
+          format: date-time
+      required: [state, dataRemainingGb, validityRemainingDays]
+    CountryStats:
+      type: object
+      properties:
+        slug:
+          type: string
+        ordersThisMonth:
+          type: integer
+      required: [slug, ordersThisMonth]
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+    Country:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        name:
+          type: string
+        flagEmoji:
+          type: string
+        region:
+          type: string
+        minPriceCents:
+          type: integer
+        tips:
+          type: string
+          nullable: true
+        planCount:
+          type: integer
+      required: [id, slug, name, flagEmoji, region, minPriceCents, planCount]
+    CountryDetail:
+      type: object
+      properties:
+        country:
+          $ref: "#/components/schemas/Country"
+        plans:
+          type: array
+          items:
+            $ref: "#/components/schemas/Plan"
+      required: [country, plans]
+    Plan:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        countryId:
+          type: string
+          format: uuid
+        countrySlug:
+          type: string
+        countryName:
+          type: string
+        flagEmoji:
+          type: string
+        dataGb:
+          type: integer
+        validityDays:
+          type: integer
+        speed:
+          type: string
+        coverage:
+          type: string
+        networkOperator:
+          type: string
+        hotspotAllowed:
+          type: boolean
+        sellingPriceCents:
+          type: integer
+        currency:
+          type: string
+      required:
+        - id
+        - countryId
+        - countrySlug
+        - countryName
+        - flagEmoji
+        - dataGb
+        - validityDays
+        - speed
+        - coverage
+        - networkOperator
+        - hotspotAllowed
+        - sellingPriceCents
+        - currency
+    OrderInput:
+      type: object
+      properties:
+        planId:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        customerCountry:
+          type: string
+      required: [planId, email]
+    OrderCreated:
+      type: object
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        publicId:
+          type: string
+          format: uuid
+        accessToken:
+          type: string
+          format: uuid
+        totalCents:
+          type: integer
+        currency:
+          type: string
+        status:
+          type: string
+      required: [orderId, publicId, accessToken, totalCents, currency, status]
+    PaymentConfirmation:
+      type: object
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        accessToken:
+          type: string
+          format: uuid
+      required: [orderId, accessToken]
+    PaymentConfirmationResult:
+      type: object
+      properties:
+        publicId:
+          type: string
+          format: uuid
+        accessToken:
+          type: string
+          format: uuid
+        status:
+          type: string
+        paymentStatus:
+          type: string
+        esimStatus:
+          type: string
+      required: [publicId, accessToken, status, paymentStatus, esimStatus]
+    AccountLinkInput:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+      required: [email]
+    AccountLinkResult:
+      type: object
+      properties:
+        message:
+          type: string
+        mockLink:
+          type: string
+      required: [message]
+    AccountOrder:
+      type: object
+      properties:
+        publicId:
+          type: string
+          format: uuid
+        accessToken:
+          type: string
+          format: uuid
+        email:
+          type: string
+        countryName:
+          type: string
+        flagEmoji:
+          type: string
+        dataGb:
+          type: integer
+        validityDays:
+          type: integer
+        totalCents:
+          type: integer
+        currency:
+          type: string
+        status:
+          type: string
+        esimStatus:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        paymentStatus:
+          type: string
+      required:
+        - publicId
+        - accessToken
+        - email
+        - countryName
+        - flagEmoji
+        - dataGb
+        - validityDays
+        - totalCents
+        - currency
+        - status
+        - esimStatus
+        - createdAt
+        - paymentStatus
+    Order:
+      type: object
+      properties:
+        publicId:
+          type: string
+          format: uuid
+        email:
+          type: string
+        name:
+          type: ["string", "null"]
+        countryName:
+          type: string
+        flagEmoji:
+          type: string
+        dataGb:
+          type: integer
+        validityDays:
+          type: integer
+        speed:
+          type: string
+        coverage:
+          type: string
+        networkOperator:
+          type: string
+        hotspotAllowed:
+          type: boolean
+        totalCents:
+          type: integer
+        currency:
+          type: string
+        status:
+          type: string
+        paymentStatus:
+          type: string
+        esimStatus:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        qrPayload:
+          type: ["string", "null"]
+        activationCode:
+          type: ["string", "null"]
+        smdpAddress:
+          type: ["string", "null"]
+        matchingId:
+          type: ["string", "null"]
+      required:
+        - publicId
+        - email
+        - name
+        - countryName
+        - flagEmoji
+        - dataGb
+        - validityDays
+        - speed
+        - coverage
+        - networkOperator
+        - hotspotAllowed
+        - totalCents
+        - currency
+        - status
+        - paymentStatus
+        - esimStatus
+        - createdAt
+        - qrPayload
+        - activationCode
+        - smdpAddress
+        - matchingId
+    WebhookInput:
+      type: object
+      properties:
+        eventId:
+          type: string
+        provider:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+      required: [eventId, provider, payload]
+    WebhookResult:
+      type: object
+      properties:
+        accepted:
+          type: boolean
+        duplicate:
+          type: boolean
+      required: [accepted, duplicate]
+
